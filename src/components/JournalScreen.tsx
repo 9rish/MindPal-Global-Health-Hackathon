@@ -1,10 +1,9 @@
 import { motion } from 'motion/react';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
 import { Card } from './ui/card';
 import { analyzeSentiment, getMoodExplanation, type AnalyzedMood } from '../utils/sentimentAnalysis';
-import { journalAPI, userManager, type User } from '../services/apiService';
 
 interface JournalEntry {
   mood: AnalyzedMood;
@@ -15,7 +14,7 @@ interface JournalEntry {
 }
 
 interface JournalScreenProps {
-  onJournalSubmit: (entry: JournalEntry, userStats: any) => void;
+  onJournalSubmit: (entry: JournalEntry) => void;
   onBack: () => void;
   petName: string;
 }
@@ -38,34 +37,6 @@ export function JournalScreen({ onJournalSubmit, onBack, petName }: JournalScree
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [detectedMood, setDetectedMood] = useState<AnalyzedMood | null>(null);
   const [moodExplanation, setMoodExplanation] = useState<string>('');
-  const [error, setError] = useState<string>('');
-  const [user, setUser] = useState<User | null>(null);
-  const [hasJournaledToday, setHasJournaledToday] = useState(false);
-
-  useEffect(() => {
-    // Get current user data
-    const currentUser = userManager.getCurrentUser();
-    setUser(currentUser);
-
-    // Check if user has already journaled today
-    checkTodayEntry();
-  }, []);
-
-  const checkTodayEntry = async () => {
-    try {
-      const response = await journalAPI.getEntries(1, 1);
-      if (response.data && response.data.entries.length > 0) {
-        const latestEntry = response.data.entries[0];
-        const entryDate = new Date(latestEntry.date);
-        const today = new Date();
-        
-        const isToday = entryDate.toDateString() === today.toDateString();
-        setHasJournaledToday(isToday);
-      }
-    } catch (error) {
-      console.error('Error checking today\'s entry:', error);
-    }
-  };
 
   const analyzeMoodFromText = (text: string) => {
     if (text.trim().length < 10) {
@@ -84,7 +55,6 @@ export function JournalScreen({ onJournalSubmit, onBack, petName }: JournalScree
   const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const text = e.target.value;
     setJournalText(text);
-    setError(''); // Clear any previous errors
     
     // Debounce mood analysis
     const timeoutId = setTimeout(() => {
@@ -94,114 +64,29 @@ export function JournalScreen({ onJournalSubmit, onBack, petName }: JournalScree
     return () => clearTimeout(timeoutId);
   };
 
-  const calculateCoinsPreview = (text: string): number => {
-    const wordCount = text.trim().split(/\s+/).length;
-    const charCount = text.length;
-    
-    let baseCoins = 10;
-    if (wordCount >= 100) baseCoins += 20;
-    else if (wordCount >= 50) baseCoins += 10;
-    else if (wordCount >= 25) baseCoins += 5;
-    
-    if (charCount >= 500) baseCoins += 10;
-    if (charCount >= 1000) baseCoins += 20;
-    
-    return Math.min(baseCoins, 60);
-  };
-
-  const handleSubmit = async () => {
-    if (!journalText.trim()) {
-      setError('Please write something in your journal');
-      return;
-    }
-
-    if (journalText.trim().length < 10) {
-      setError('Please write at least 10 characters for a meaningful entry');
-      return;
-    }
-
-    if (hasJournaledToday) {
-      setError('You have already made a journal entry today. Come back tomorrow!');
-      return;
-    }
+  const handleSubmit = () => {
+    if (!journalText.trim()) return;
     
     setIsSubmitting(true);
-    setError('');
     
-    try {
-      // Analyze sentiment one final time
-      const finalMood = analyzeSentiment(journalText);
-      const finalExplanation = getMoodExplanation(journalText, finalMood);
-      
-      // Submit to backend
-      const response = await journalAPI.createEntry({
-        content: journalText.trim(),
-        mood: finalMood,
-        aiAnalysis: finalExplanation
-      });
-
-      if (response.error) {
-        setError(response.error);
-        return;
-      }
-
-      if (response.data) {
-        // Update user data in localStorage
-        const currentUser = userManager.getCurrentUser();
-        if (currentUser) {
-          const updatedUser: User = {
-            ...currentUser,
-            totalCoins: response.data.userStats.totalCoins,
-            currentStreak: response.data.userStats.currentStreak,
-            level: response.data.userStats.level,
-            petData: {
-              ...currentUser.petData,
-              happiness: response.data.userStats.petHappiness
-            }
-          };
-          userManager.saveUser(updatedUser);
-          setUser(updatedUser);
-        }
-
-        // Create journal entry object for parent component
-        const entry: JournalEntry = {
-          mood: finalMood,
-          content: journalText.trim(),
-          date: new Date(),
-          aiAnalysis: finalExplanation
-        };
-
-        // Show success and navigate back
-        onJournalSubmit(entry, response.data.userStats);
-      }
-      
-    } catch (error) {
-      console.error('Error saving journal entry:', error);
-      setError('Failed to save journal entry. Please try again.');
-    } finally {
+    // Analyze sentiment one final time
+    const finalMood = analyzeSentiment(journalText);
+    const finalExplanation = getMoodExplanation(journalText, finalMood);
+    
+    // Create journal entry
+    const entry: JournalEntry = {
+      mood: finalMood,
+      content: journalText.trim(),
+      date: new Date(),
+      aiAnalysis: finalExplanation
+    };
+    
+    // Simulate processing time for AI analysis
+    setTimeout(() => {
+      onJournalSubmit(entry);
       setIsSubmitting(false);
-    }
+    }, 2000);
   };
-
-  if (hasJournaledToday) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-pink-100 via-purple-50 to-indigo-100 p-6 flex items-center justify-center">
-        <Card className="p-8 bg-white/70 backdrop-blur-sm border-0 shadow-lg rounded-3xl max-w-md text-center">
-          <div className="text-6xl mb-4">🎉</div>
-          <h2 className="text-2xl mb-4">Great Job!</h2>
-          <p className="text-gray-600 mb-6">
-            You've already completed your journal entry for today. Your consistency is amazing! 
-          </p>
-          <p className="text-sm text-gray-500 mb-6">
-            Come back tomorrow to continue your journey with {petName}!
-          </p>
-          <Button onClick={onBack} className="bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 text-white rounded-full px-6">
-            Back to Dashboard
-          </Button>
-        </Card>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-pink-100 via-purple-50 to-indigo-100 p-6">
@@ -222,24 +107,8 @@ export function JournalScreen({ onJournalSubmit, onBack, petName }: JournalScree
           <h1 className="text-2xl bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent">
             Daily Journal
           </h1>
-          <div className="text-right">
-            <div className="text-sm text-gray-600">Current Coins</div>
-            <div className="text-lg font-bold text-yellow-600">🪙 {user?.totalCoins || 0}</div>
-          </div>
+          <div className="w-16" /> {/* Spacer */}
         </motion.div>
-
-        {/* Error Message */}
-        {error && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="mb-6"
-          >
-            <Card className="p-4 bg-red-100 border-red-200 rounded-2xl">
-              <p className="text-red-600 text-sm">{error}</p>
-            </Card>
-          </motion.div>
-        )}
 
         {/* AI Mood Detection */}
         {detectedMood && (
@@ -290,23 +159,16 @@ export function JournalScreen({ onJournalSubmit, onBack, petName }: JournalScree
               onChange={handleTextChange}
               placeholder="Write about your day, feelings, thoughts, or anything that comes to mind... I'll analyze your mood automatically! ✨"
               className="min-h-[200px] border-0 bg-white/50 rounded-2xl resize-none focus:ring-2 focus:ring-purple-300 transition-all"
-              disabled={isSubmitting}
             />
             
             <div className="flex justify-between items-center mt-4">
-              <div className="text-sm text-gray-500">
-                <div>{journalText.length} characters</div>
-                <div>{journalText.trim().split(/\s+/).length} words</div>
-                {journalText.length > 10 && (
-                  <div className="text-yellow-600 font-medium">
-                    🪙 {calculateCoinsPreview(journalText)} coins estimated
-                  </div>
-                )}
-              </div>
+              <p className="text-sm text-gray-500">
+                {journalText.length} characters
+              </p>
               
               <Button
                 onClick={handleSubmit}
-                disabled={!journalText.trim() || isSubmitting || journalText.trim().length < 10}
+                disabled={!journalText.trim() || isSubmitting}
                 className="bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 text-white rounded-full px-6 transition-all duration-300"
               >
                 {isSubmitting ? (
@@ -317,7 +179,7 @@ export function JournalScreen({ onJournalSubmit, onBack, petName }: JournalScree
                     >
                       🤖
                     </motion.div>
-                    <span>Saving...</span>
+                    <span>Analyzing...</span>
                   </div>
                 ) : (
                   'Save Entry ✨'
@@ -340,11 +202,6 @@ export function JournalScreen({ onJournalSubmit, onBack, petName }: JournalScree
           {journalText.length > 0 && journalText.length < 10 && (
             <p className="text-xs text-gray-500 mt-2">
               Write a bit more for mood detection to work ✍️
-            </p>
-          )}
-          {user?.currentStreak && user.currentStreak > 0 && (
-            <p className="text-sm text-orange-600 mt-2">
-              🔥 Current streak: {user.currentStreak} days!
             </p>
           )}
         </motion.div>
