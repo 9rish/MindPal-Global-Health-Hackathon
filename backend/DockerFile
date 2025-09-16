@@ -1,0 +1,27 @@
+FROM node:18-alpine
+
+WORKDIR /app
+COPY package*.json ./
+
+# Install dependencies
+RUN npm ci --only=production
+
+# Copy source code
+COPY . .
+
+# Build TypeScript
+RUN npm run build
+
+# Expose port
+EXPOSE 3001
+
+# Create non-root user
+RUN addgroup -g 1001 -S nodejs
+RUN adduser -S mindpal -u 1001
+
+# Change ownership
+RUN chown -R mindpal:nodejs /app
+USER mindpal
+
+# Start the application
+CMD ["npm", "start"]
