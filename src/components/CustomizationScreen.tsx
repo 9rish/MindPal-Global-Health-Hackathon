@@ -1,12 +1,13 @@
 "use client";
-
-import { useState } from 'react';
-import { motion } from 'motion/react';
 import { Button } from './ui/button';
+import { api } from '../utils/api';
+import { useState, useEffect, React } from 'react';
+import { motion } from 'motion/react';
 import { Card } from './ui/card';
-import { ArrowLeft, Coins, ShoppingBag, Sparkles } from 'lucide-react';
+import { ArrowLeft, Coins, ShoppingBag, Sparkles, ShieldCheck } from 'lucide-react';
 import { PetAnimation } from './PetAnimation';
-import { Pet } from '../types'; // <- import your Pet type
+import { Pet } from '../types';
+import { supabase } from '../utils/supabase/client'; // Import the Supabase client
 
 interface Accessory {
   id: string;
@@ -24,16 +25,32 @@ interface CustomizationScreenProps {
   onBack: () => void;
 }
 
+// Define a simple User type for state management
+interface User {
+  id: string;
+}
+
 export function CustomizationScreen({ pet, coins, onCoinsUpdate, onBack }: CustomizationScreenProps) {
   const [selectedCategory, setSelectedCategory] = useState<string>('hat');
   const [ownedItems, setOwnedItems] = useState<string[]>(() => {
     const saved = localStorage.getItem('mindpal-owned-items');
     return saved ? JSON.parse(saved) : [];
   });
-
   const [petMood, setPetMood] = useState<'calm' | 'dancing' | 'hungry'>('calm');
+  const [user, setUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    // Fetch the current user from Supabase auth when the component loads
+    const fetchUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user as User);
+    };
+
+    fetchUser();
+  }, []);
 
   const accessories: Accessory[] = [
+    // Your accessories data remains unchanged...
     // Hats
     { id: 'hat1', name: 'Party Hat', emoji: '🎉', price: 50, category: 'hat', description: 'Perfect for celebrations!' },
     { id: 'hat2', name: 'Crown', emoji: '👑', price: 100, category: 'hat', description: 'Fit for royalty' },
@@ -64,6 +81,7 @@ export function CustomizationScreen({ pet, coins, onCoinsUpdate, onBack }: Custo
     { id: 'outfit', name: 'Outfits', emoji: '👔' },
     { id: 'accessory', name: 'Accessories', emoji: '✨' },
     { id: 'background', name: 'Backgrounds', emoji: '🎨' },
+    { id: 'premium', name: 'Premium', emoji: '💎' } // Added for the new section
   ];
 
   const filteredAccessories = accessories.filter(acc => acc.category === selectedCategory);
@@ -77,16 +95,29 @@ export function CustomizationScreen({ pet, coins, onCoinsUpdate, onBack }: Custo
       setOwnedItems(newOwnedItems);
       localStorage.setItem('mindpal-owned-items', JSON.stringify(newOwnedItems));
 
-      // Show dancing animation
       setPetMood('dancing');
       setTimeout(() => setPetMood('calm'), 2000);
 
-      // Purchase message
       const celebration = document.createElement('div');
       celebration.innerHTML = `${accessory.emoji} Purchased!`;
       celebration.className = 'fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-4xl font-bold text-purple-600 pointer-events-none z-50 animate-bounce';
       document.body.appendChild(celebration);
       setTimeout(() => celebration.remove(), 2000);
+    }
+  };
+
+  const handleEnablePremium = async () => {
+    if (!user) {
+      alert('You must be logged in to enable premium.');
+      return;
+    }
+
+    try {
+      await api.updateProfile(user.id, { isPremium: true });
+      alert('Premium enabled successfully! ✨ You now have access to all exclusive features.');
+    } catch (error) {
+      console.error('Failed to enable premium:', error);
+      alert('There was an error enabling premium. Please try again later.');
     }
   };
 
@@ -103,7 +134,7 @@ export function CustomizationScreen({ pet, coins, onCoinsUpdate, onBack }: Custo
             <ArrowLeft className="w-5 h-5" />
             <span>Back</span>
           </Button>
-          
+
           <div className="flex items-center space-x-2 bg-gradient-to-r from-yellow-200 to-yellow-300 px-4 py-2 rounded-full">
             <Coins className="w-5 h-5" />
             <span className="font-medium">{coins}</span>
@@ -150,69 +181,95 @@ export function CustomizationScreen({ pet, coins, onCoinsUpdate, onBack }: Custo
           ))}
         </div>
 
-        {/* Items Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {filteredAccessories.map((accessory, index) => {
-            const isOwned = ownedItems.includes(accessory.id);
-            const canAfford = coins >= accessory.price;
-
-            return (
-              <motion.div
-                key={accessory.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.1 }}
+        {/* Conditional Rendering for Premium Section */}
+        {selectedCategory === 'premium' ? (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg rounded-2xl p-8 text-center">
+              <div className="flex items-center justify-center space-x-4 mb-4">
+                <ShieldCheck className="w-8 h-8 text-green-600" />
+                <h2 className="text-2xl font-medium text-gray-800">MindPal Premium</h2>
+              </div>
+              <p className="text-gray-600 mb-6 max-w-md mx-auto">
+                Upgrade to unlock exclusive pets, accessories, and special features to enhance your wellness journey!
+              </p>
+              <Button
+                onClick={handleEnablePremium}
+                className="w-full max-w-xs mx-auto bg-gradient-to-r from-green-400 to-green-500 hover:from-green-500 hover:to-green-600 text-white rounded-full px-6 py-3 font-medium"
+                disabled={!user} // Button is disabled if user is not logged in
               >
-                <Card className={`p-6 border-0 shadow-lg rounded-2xl transition-all duration-300 ${
-                  isOwned 
-                    ? 'bg-gradient-to-r from-green-100 to-emerald-100 border-2 border-green-200' 
-                    : 'bg-white/80 backdrop-blur-sm hover:shadow-xl hover:scale-105'
-                }`}>
-                  <div className="text-center mb-4">
-                    <div className="text-4xl mb-2">{accessory.emoji}</div>
-                    <h3 className="font-medium text-gray-800 mb-1">{accessory.name}</h3>
-                    <p className="text-sm text-gray-600 mb-3">{accessory.description}</p>
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2 text-yellow-600">
-                      <Coins className="w-4 h-4" />
-                      <span className="font-medium">{accessory.price}</span>
-                    </div>
-                    
-                    {isOwned ? (
-                      <div className="flex items-center space-x-2 text-green-600">
-                        <Sparkles className="w-4 h-4" />
-                        <span className="font-medium text-sm">Owned</span>
-                      </div>
-                    ) : (
-                      <Button
-                        onClick={() => purchaseItem(accessory)}
-                        disabled={!canAfford}
-                        className={`rounded-full px-4 py-2 font-medium text-sm ${
-                          canAfford
-                            ? 'bg-gradient-to-r from-purple-400 to-pink-500 hover:from-purple-500 hover:to-pink-600 text-white'
-                            : 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                        }`}
-                      >
-                        <ShoppingBag className="w-3 h-3 mr-1" />
-                        Buy
-                      </Button>
-                    )}
-                  </div>
-                </Card>
-              </motion.div>
-            );
-          })}
-        </div>
+                Enable Premium
+              </Button>
+            </Card>
+          </motion.div>
+        ) : (
+          <>
+            {/* Items Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {filteredAccessories.map((accessory, index) => {
+                const isOwned = ownedItems.includes(accessory.id);
+                const canAfford = coins >= accessory.price;
 
-        {/* No items message */}
-        {filteredAccessories.length === 0 && (
-          <div className="text-center py-12">
-            <div className="text-6xl mb-4">🎨</div>
-            <h3 className="text-xl font-medium text-gray-800 mb-2">Coming Soon!</h3>
-            <p className="text-gray-600">More items will be added to this category soon.</p>
-          </div>
+                return (
+                  <motion.div
+                    key={accessory.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.1 }}
+                  >
+                    <Card className={`p-6 border-0 shadow-lg rounded-2xl transition-all duration-300 ${
+                      isOwned
+                        ? 'bg-gradient-to-r from-green-100 to-emerald-100 border-2 border-green-200'
+                        : 'bg-white/80 backdrop-blur-sm hover:shadow-xl hover:scale-105'
+                    }`}>
+                      <div className="text-center mb-4">
+                        <div className="text-4xl mb-2">{accessory.emoji}</div>
+                        <h3 className="font-medium text-gray-800 mb-1">{accessory.name}</h3>
+                        <p className="text-sm text-gray-600 mb-3">{accessory.description}</p>
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2 text-yellow-600">
+                          <Coins className="w-4 h-4" />
+                          <span className="font-medium">{accessory.price}</span>
+                        </div>
+
+                        {isOwned ? (
+                          <div className="flex items-center space-x-2 text-green-600">
+                            <Sparkles className="w-4 h-4" />
+                            <span className="font-medium text-sm">Owned</span>
+                          </div>
+                        ) : (
+                          <Button
+                            onClick={() => purchaseItem(accessory)}
+                            disabled={!canAfford}
+                            className={`rounded-full px-4 py-2 font-medium text-sm ${
+                              canAfford
+                                ? 'bg-gradient-to-r from-purple-400 to-pink-500 hover:from-purple-500 hover:to-pink-600 text-white'
+                                : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                            }`}
+                          >
+                            <ShoppingBag className="w-3 h-3 mr-1" />
+                            Buy
+                          </Button>
+                        )}
+                      </div>
+                    </Card>
+                  </motion.div>
+                );
+              })}
+            </div>
+            {filteredAccessories.length === 0 && (
+                <div className="text-center py-12">
+                  <div className="text-6xl mb-4">🎨</div>
+                  <h3 className="text-xl font-medium text-gray-800 mb-2">Coming Soon!</h3>
+                  <p className="text-gray-600">More items will be added to this category soon.</p>
+                </div>
+              )}
+          </>
         )}
 
         {/* Tips Card */}

@@ -3,6 +3,21 @@ import { motion } from 'motion/react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { ArrowLeft, CheckCircle2, Clock, Coins } from 'lucide-react';
+import { api } from '../utils/api';
+
+// This function should be in the parent component of QuestsAndCoins
+const handleCompleteQuest = async (questId: string, reward: number) => {
+  try {
+    // Assuming you have the user's ID
+    const userId = 'USER_ID'; // Replace with the actual user ID
+    await api.completeQuest(userId, questId, reward);
+
+    // You might want to refresh the user's profile here
+    // to get the updated coin count.
+  } catch (error) {
+    console.error('Failed to complete quest:', error);
+  }
+};
 
 interface Quest {
   id: string;

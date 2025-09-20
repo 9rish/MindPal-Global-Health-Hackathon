@@ -11,10 +11,12 @@ import { analyzeMoods } from "./utils/moodAnalytics";
 import { Button } from "./components/ui/button";
 import { Card } from "./components/ui/card";
 import { Badge } from "./components/ui/badge";
-import { motion } from "motion/react";
-import  MindPalLeaderboard from "./components/mindpal_leaderboard";
-import { Pet } from './types';
-
+import { motion } from "framer-motion";
+import MindPalLeaderboard from "./components/mindpal_leaderboard";
+import { Pet, User } from './types';
+import { supabase } from "./utils/supabase/client";
+import { AuthScreen } from "./components/AuthScreen";
+import { GuestModeReminder } from "./components/GuestModeReminder";
 
 interface JournalEntry {
   mood:
@@ -47,28 +49,70 @@ type Screen =
   | "leaderboard";
 type PetMood = "happy" | "sad" | "calm" | "angry";
 
+// Extending the User type locally to include is_anonymous without modifying the central types.tsx
+type AppUser = User & { is_anonymous?: boolean };
+
 export default function App() {
+  const [user, setUser] = useState<AppUser | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // Authentication logic
+  useEffect(() => {
+    const session = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (session) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .single();
+
+        const userData: AppUser = {
+          id: session.user.id,
+          email: session.user.email,
+          is_anonymous: session.user.is_anonymous,
+          name: profile?.name || session.user.user_metadata?.full_name || 'Guest',
+          username: profile?.username || 'Guest',
+          isPremium: profile?.is_premium || false,
+          createdAt: new Date(session.user.created_at),
+          selected_pet: profile?.selected_pet,
+          coins: profile?.coins,
+          journal_entries: profile?.journal_entries,
+          pet_mood: profile?.pet_mood,
+        };
+        setUser(userData);
+      } else {
+        setUser(null);
+      }
+      setLoading(false);
+    });
+    
+    setLoading(false);
+    return () => {
+      session.data.subscription.unsubscribe();
+    };
+  }, []);
+  
   const [openGroup, setOpenGroup] =
   useState<null | "tracking" | "pet" | "explore">(null);
   const toggleGroup = (g: "tracking" | "pet" | "explore") =>
   setOpenGroup(prev => (prev === g ? null : g));
 
   const [currentScreen, setCurrentScreen] =
-    useState<Screen>("pet-selection");
+    useState<Screen>("home");
   const [selectedPet, setSelectedPet] = useState<Pet | null>(
-    null,
+    user?.selected_pet || null
   );
-  const [coins, setCoins] = useState(100);
+  const [coins, setCoins] = useState(user?.coins || 100);
   const [journalEntries, setJournalEntries] = useState<
     JournalEntry[]
-  >([]);
-  const [petMood, setPetMood] = useState<PetMood>("calm");
+  >(user?.journal_entries || []);
+  const [petMood, setPetMood] = useState<PetMood>(user?.pet_mood as PetMood || "calm");
   const [lastJournaled, setLastJournaled] =
     useState<Date | null>(null);
   const [showWelcomeAnimation, setShowWelcomeAnimation] =
     useState(false);
   const [showRiskNudge, setShowRiskNudge] = useState(false);
-  const [isPremium, setIsPremium] = useState(false);
+  const [isPremium, setIsPremium] = useState(user?.isPremium || false);
   const [showPremiumModal, setShowPremiumModal] =
     useState(false);
   const [showMoodReward, setShowMoodReward] = useState(false);
@@ -77,75 +121,68 @@ export default function App() {
   const [showPremiumSuccess, setShowPremiumSuccess] =
     useState(false);
     
-  // Load data from localStorage on mount
+  // Load data from user profile on user change
   useEffect(() => {
-    // Load saved coins
-    const savedCoins = localStorage.getItem("mindpal-coins");
-    if (savedCoins) {
-      setCoins(parseInt(savedCoins));
-    }
+    if (user) {
+      setSelectedPet(user.selected_pet || null);
+      setCoins(user.coins || 100);
+      setJournalEntries(user.journal_entries || []);
+      setPetMood((user.pet_mood as PetMood) || "calm");
+      setIsPremium(user.isPremium || false);
 
-    // Load saved journal entries
-    const savedEntries = localStorage.getItem("mindpal-entries");
-    if (savedEntries) {
-      const entries = JSON.parse(savedEntries);
-      setJournalEntries(entries);
-      if (entries.length > 0) {
-        const lastEntry = entries[entries.length - 1];
-        setLastJournaled(new Date(lastEntry.date));
-        updatePetMood(lastEntry.mood);
+      if (user.selected_pet) {
+        setCurrentScreen("home");
+      } else {
+        setCurrentScreen("pet-selection");
       }
+    } else {
+        setCurrentScreen("pet-selection");
     }
+  }, [user]);
 
-    // Load saved pet mood if available
-    const savedPetMood = localStorage.getItem("mindpal-pet-mood");
-    if (savedPetMood) {
-      setPetMood(savedPetMood as PetMood);
-    }
+  // Save data to Supabase
+  const saveData = async (data: Partial<User>) => {
+    if (!user || user.is_anonymous) return; // Don't save for guests
+    const { error } = await supabase
+      .from('profiles')
+      .update(data)
+      .eq('id', user.id);
+    if (error) console.error("Error saving data:", error);
+  };
 
-    // Load premium status
-    const savedPremium = localStorage.getItem("mindpal-premium");
-    if (savedPremium === "true") {
-      setIsPremium(true);
-    }
-
-    // Load saved pet - but don't automatically go to home screen
-    const savedPet = localStorage.getItem("mindpal-pet");
-    if (savedPet) {
-      const pet = JSON.parse(savedPet);
-      setSelectedPet(pet);
-      // Remove this line to stay on pet selection screen:
-      // setCurrentScreen("home");
-    }
-  }, []);
-
-  // Save data to localStorage
   useEffect(() => {
-    if (selectedPet) {
-      localStorage.setItem(
-        "mindpal-pet",
-        JSON.stringify(selectedPet),
-      );
+    if(selectedPet){
+      saveData({ selected_pet: selectedPet });
     }
   }, [selectedPet]);
 
   useEffect(() => {
-    localStorage.setItem("mindpal-coins", coins.toString());
+     saveData({ coins: coins });
   }, [coins]);
 
   useEffect(() => {
-    localStorage.setItem(
-      "mindpal-entries",
-      JSON.stringify(journalEntries),
-    );
+    saveData({ journal_entries: journalEntries });
   }, [journalEntries]);
+    
+  useEffect(() => {
+    if (user && !user.is_anonymous) {
+      const dataToUpdate = { is_premium: isPremium };
+      supabase
+        .from('profiles')
+        .update(dataToUpdate)
+        .eq('id', user.id)
+        .then(({ error }) => {
+          if (error) {
+            console.error('Error updating premium status:', error);
+          }
+        });
+    }
+  }, [isPremium, user]);
+
 
   useEffect(() => {
-    localStorage.setItem(
-      "mindpal-premium",
-      isPremium.toString(),
-    );
-  }, [isPremium]);
+    saveData({ pet_mood: petMood });
+  }, [petMood]);
 
   // Check for risk patterns and show nudges
   useEffect(() => {
@@ -177,9 +214,6 @@ export default function App() {
     };
     const newPetMood = moodMapping[journalMood] || "calm";
     setPetMood(newPetMood);
-
-    // Store pet mood in localStorage for persistence
-    localStorage.setItem("mindpal-pet-mood", newPetMood);
   };
 
   const handlePetSelected = (pet: Pet) => {
@@ -266,6 +300,23 @@ export default function App() {
       setCurrentScreen("feed");
     }
   };
+  
+    const handleLogout = async () => {
+        await supabase.auth.signOut();
+        setUser(null);
+        setCurrentScreen('pet-selection');
+        // Clear all local state
+        setSelectedPet(null);
+        setCoins(100);
+        setJournalEntries([]);
+        setPetMood('calm');
+        setIsPremium(false);
+    };
+
+    const handleGoToSignUp = async () => {
+        await handleLogout();
+        // The onAuthStateChange listener will handle showing the AuthScreen
+    };
 
   const handleSubscribe = () => {
     setIsPremium(true);
@@ -289,11 +340,25 @@ export default function App() {
   };
 
   // Add a function to reset and go back to pet selection
-  const resetToPetSelection = () => {
+  const resetToPetSelection = async () => {
+     if(user && !user.is_anonymous) {
+        await supabase.from('profiles').update({ selected_pet: null }).eq('id', user.id);
+     }
     setCurrentScreen("pet-selection");
     setSelectedPet(null);
-    localStorage.removeItem("mindpal-pet");
   };
+
+  if (loading) {
+     return (
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-violet-100 to-teal-100">
+            <div className="w-16 h-16 border-4 border-purple-300 border-t-purple-600 rounded-full animate-spin"></div>
+        </div>
+     )
+  }
+
+  if (!user) {
+    return <AuthScreen onAuthSuccess={() => {}} />;
+  }
 
   if (showWelcomeAnimation) {
     return (
@@ -350,7 +415,7 @@ export default function App() {
     );
   }
 
-  if (currentScreen === "pet-selection") {
+  if (currentScreen === "pet-selection" || !selectedPet) {
     return <PetSelection onPetSelected={handlePetSelected} />;
   }
 
@@ -455,11 +520,17 @@ export default function App() {
       </div>
 
       <div className="relative z-10 max-w-4xl mx-auto">
+        
+        {/* GUEST MODE REMINDER */}
+        {user?.is_anonymous && (
+          <GuestModeReminder onSignUpClick={handleGoToSignUp} />
+        )}
+        
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-3xl text-gray-800 mb-2 font-medium">
-              Hello! 👋
+              Hello, {user.username}! 👋
             </h1>
             <p className="text-gray-600">
               How are you feeling today?
@@ -477,6 +548,15 @@ export default function App() {
               🔄 Change Pet
             </Button>
             
+            <Button
+              onClick={handleLogout}
+              variant="destructive"
+              size="sm"
+              className="rounded-full px-3 py-1 text-xs"
+            >
+              Logout
+            </Button>
+
             {isPremium && (
               <div className="flex items-center space-x-2 bg-gradient-to-r from-pink-200 to-purple-300 px-3 py-1 rounded-full">
                 <span>👑</span>
@@ -501,13 +581,15 @@ export default function App() {
         </div>
 
         {/* Pet Companion */}
-        <div className="mb-8">
-          <PetCompanion
-            pet={selectedPet!}
-            mood={petMood}
-            lastJournaled={lastJournaled || undefined}
-          />
-        </div>
+        {selectedPet && (
+            <div className="mb-8">
+            <PetCompanion
+                pet={selectedPet}
+                mood={petMood}
+                lastJournaled={lastJournaled || undefined}
+            />
+            </div>
+        )}
 
         {/* Current Mood Display */}
         {journalEntries.length > 0 && (

@@ -9,7 +9,7 @@ const app = new Hono();
 // Middleware
 app.use('*', cors({
   origin: '*',
-  allowHeaders: ['*'],
+  allowHeaders: ['*'],userId
   allowMethods: ['*'],
 }));
 app.use('*', logger(console.log));
@@ -23,26 +23,26 @@ const supabase = createClient(
 // Helper function to detect mood from text
 function detectMoodFromText(text: string): 'happy' | 'sad' | 'stressed' | 'calm' {
   const lowerText = text.toLowerCase();
-  
+
   // Happy indicators
   const happyWords = ['happy', 'great', 'amazing', 'wonderful', 'excited', 'joy', 'fantastic', 'awesome', 'love', 'grateful', 'blessed', 'perfect'];
   const happyCount = happyWords.filter(word => lowerText.includes(word)).length;
-  
+
   // Sad indicators
   const sadWords = ['sad', 'upset', 'down', 'terrible', 'awful', 'depressed', 'lonely', 'crying', 'hurt', 'disappointed', 'broken'];
   const sadCount = sadWords.filter(word => lowerText.includes(word)).length;
-  
+
   // Stressed indicators
   const stressWords = ['stress', 'anxiety', 'worried', 'overwhelm', 'panic', 'pressure', 'tense', 'nervous', 'frantic', 'chaos', 'exhausted'];
   const stressCount = stressWords.filter(word => lowerText.includes(word)).length;
-  
+
   // Calm indicators
   const calmWords = ['calm', 'peace', 'relaxed', 'serene', 'tranquil', 'zen', 'peaceful', 'quiet', 'still', 'centered', 'balanced'];
   const calmCount = calmWords.filter(word => lowerText.includes(word)).length;
-  
+
   // Determine dominant mood
   const maxCount = Math.max(happyCount, sadCount, stressCount, calmCount);
-  
+
   if (maxCount === 0) return 'calm'; // default
   if (happyCount === maxCount) return 'happy';
   if (sadCount === maxCount) return 'sad';
@@ -51,6 +51,7 @@ function detectMoodFromText(text: string): 'happy' | 'sad' | 'stressed' | 'calm'
 }
 
 // Routes
+
 
 // Get user profile and pet data
 app.get('/make-server-6d448e25/profile/:userId', async (c) => {
@@ -65,11 +66,12 @@ app.get('/make-server-6d448e25/profile/:userId', async (c) => {
         userId,
         selectedPet: null,
         level: 1,
-        gems: 100,
+        coins: 100, // Use coins instead of gems
         streak: 0,
         joinDate: new Date().toISOString(),
         totalEntries: 0,
-        lastActive: new Date().toISOString()
+        lastActive: new Date().toISOString(),
+        isPremium: false // Add this line
       };
       
       await kv.set(`profile:${userId}`, defaultProfile);
@@ -83,19 +85,21 @@ app.get('/make-server-6d448e25/profile/:userId', async (c) => {
   }
 });
 
+// ... (the rest of your file)
+
 // Update user profile
 app.post('/make-server-6d448e25/profile/:userId', async (c) => {
   try {
     const userId = c.req.param('userId');
     const updates = await c.req.json();
-    
+
     const existingProfile = await kv.get(`profile:${userId}`);
     const updatedProfile = {
       ...existingProfile,
       ...updates,
       lastActive: new Date().toISOString()
     };
-    
+
     await kv.set(`profile:${userId}`, updatedProfile);
     return c.json(updatedProfile);
   } catch (error) {
@@ -109,14 +113,14 @@ app.post('/make-server-6d448e25/journal/:userId', async (c) => {
   try {
     const userId = c.req.param('userId');
     const { text, mood } = await c.req.json();
-    
+
     if (!text || !text.trim()) {
       return c.json({ error: 'Journal text is required' }, 400);
     }
-    
+
     const entryId = `entry:${userId}:${Date.now()}`;
     const detectedMood = detectMoodFromText(text);
-    
+
     const entry = {
       id: entryId,
       userId,
@@ -126,26 +130,26 @@ app.post('/make-server-6d448e25/journal/:userId', async (c) => {
       timestamp: new Date().toISOString(),
       wordCount: text.trim().split(/\s+/).length
     };
-    
+
     await kv.set(entryId, entry);
-    
+
     // Update user profile stats
     const profile = await kv.get(`profile:${userId}`);
     if (profile) {
       const today = new Date().toDateString();
       const lastActiveDate = new Date(profile.lastActive).toDateString();
-      
+
       const updatedProfile = {
         ...profile,
         totalEntries: (profile.totalEntries || 0) + 1,
         lastActive: new Date().toISOString(),
         streak: today === lastActiveDate ? profile.streak : (profile.streak || 0) + 1,
-        gems: (profile.gems || 0) + 10 // Reward for journaling
+        coins: (profile.coins || 0) + 10 // Changed gems to coins and reward for journaling
       };
-      
+
       await kv.set(`profile:${userId}`, updatedProfile);
     }
-    
+
     return c.json({ entry, detectedMood });
   } catch (error) {
     console.log('Error saving journal entry:', error);
@@ -158,14 +162,14 @@ app.get('/make-server-6d448e25/journal/:userId', async (c) => {
   try {
     const userId = c.req.param('userId');
     const limit = parseInt(c.req.query('limit') || '10');
-    
+
     const entries = await kv.getByPrefix(`entry:${userId}:`);
-    
+
     // Sort by timestamp (newest first) and limit
     const sortedEntries = entries
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
       .slice(0, limit);
-    
+
     return c.json(sortedEntries);
   } catch (error) {
     console.log('Error fetching journal entries:', error);
@@ -178,16 +182,16 @@ app.get('/make-server-6d448e25/analytics/:userId', async (c) => {
   try {
     const userId = c.req.param('userId');
     const days = parseInt(c.req.query('days') || '7');
-    
+
     const entries = await kv.getByPrefix(`entry:${userId}:`);
-    
+
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - days);
-    
-    const recentEntries = entries.filter(entry => 
+
+    const recentEntries = entries.filter(entry =>
       new Date(entry.timestamp) >= cutoffDate
     );
-    
+
     // Calculate mood distribution
     const moodCounts = { happy: 0, sad: 0, stressed: 0, calm: 0 };
     recentEntries.forEach(entry => {
@@ -195,7 +199,7 @@ app.get('/make-server-6d448e25/analytics/:userId', async (c) => {
         moodCounts[entry.detectedMood]++;
       }
     });
-    
+
     // Calculate daily averages
     const dailyMoods: { [key: string]: string[] } = {};
     recentEntries.forEach(entry => {
@@ -203,7 +207,7 @@ app.get('/make-server-6d448e25/analytics/:userId', async (c) => {
       if (!dailyMoods[date]) dailyMoods[date] = [];
       dailyMoods[date].push(entry.detectedMood);
     });
-    
+
     const moodTrend = Object.entries(dailyMoods).map(([date, moods]) => {
       const moodScore = moods.reduce((score, mood) => {
         switch (mood) {
@@ -214,19 +218,19 @@ app.get('/make-server-6d448e25/analytics/:userId', async (c) => {
           default: return score;
         }
       }, 0) / moods.length;
-      
+
       return { date, score: moodScore, count: moods.length };
     });
-    
+
     // Generate insights
     const totalEntries = recentEntries.length;
     const mostCommonMood = Object.entries(moodCounts)
       .sort(([,a], [,b]) => b - a)[0]?.[0] || 'calm';
-    
-    const averageWordsPerEntry = totalEntries > 0 
+
+    const averageWordsPerEntry = totalEntries > 0
       ? Math.round(recentEntries.reduce((sum, entry) => sum + (entry.wordCount || 0), 0) / totalEntries)
       : 0;
-    
+
     return c.json({
       period: `${days} days`,
       totalEntries,
@@ -252,9 +256,9 @@ app.get('/make-server-6d448e25/analytics/:userId', async (c) => {
 app.get('/make-server-6d448e25/quests/:userId', async (c) => {
   try {
     const userId = c.req.param('userId');
-    
+
     const questProgress = await kv.get(`quests:${userId}`);
-    
+
     if (!questProgress) {
       const defaultQuests = {
         userId,
@@ -267,11 +271,11 @@ app.get('/make-server-6d448e25/quests/:userId', async (c) => {
         weeklyStreak: 0,
         lastReset: new Date().toISOString()
       };
-      
+
       await kv.set(`quests:${userId}`, defaultQuests);
       return c.json(defaultQuests);
     }
-    
+
     return c.json(questProgress);
   } catch (error) {
     console.log('Error fetching quests:', error);
@@ -283,29 +287,29 @@ app.post('/make-server-6d448e25/quests/:userId/complete', async (c) => {
   try {
     const userId = c.req.param('userId');
     const { questId, reward } = await c.req.json();
-    
+
     const questProgress = await kv.get(`quests:${userId}`) || {
       userId,
       quests: {},
       weeklyStreak: 0
     };
-    
+
     if (!questProgress.quests[questId]) {
       questProgress.quests[questId] = { progress: 0, completed: false };
     }
-    
+
     questProgress.quests[questId].completed = true;
     questProgress.quests[questId].completedAt = new Date().toISOString();
-    
+
     await kv.set(`quests:${userId}`, questProgress);
-    
-    // Update user gems
+
+    // Update user coins
     const profile = await kv.get(`profile:${userId}`);
     if (profile) {
-      profile.gems = (profile.gems || 0) + reward;
+      profile.coins = (profile.coins || 0) + reward; // Changed gems to coins
       await kv.set(`profile:${userId}`, profile);
     }
-    
+
     return c.json({ success: true, questProgress });
   } catch (error) {
     console.log('Error completing quest:', error);
