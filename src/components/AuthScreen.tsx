@@ -3,13 +3,15 @@ import { motion } from "framer-motion";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
 import { User } from "../types";
-import { supabase } from '../utils/supabase/client'; // Import Supabase client
+import { supabase } from '../utils/supabase/client';
+import { ToggleGroup, ToggleGroupItem } from "./ui/toggle-group";
 
 interface AuthScreenProps {
   onAuthSuccess: (user: User) => void;
 }
 
 type AuthMode = "login" | "signup" | "welcome";
+type UserRole = "user" | "therapist";
 
 export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
   const [mode, setMode] = useState<AuthMode>("welcome");
@@ -22,6 +24,7 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
   const [name, setName] = useState("");
   const [username, setUsername] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [userType, setUserType] = useState<UserRole>("user");
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,13 +42,13 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
           options: {
             data: {
               full_name: name,
-              username: username,
+              username: userType === 'user' ? username : null,
+              user_type: userType,
             },
           },
         });
 
         if (signUpError) throw signUpError;
-        // The onAuthStateChange listener in App.tsx will handle the rest.
 
       } else if (mode === "login") {
         const { error: signInError } = await supabase.auth.signInWithPassword({
@@ -53,7 +56,6 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
           password,
         });
         if (signInError) throw signInError;
-        // The onAuthStateChange listener in App.tsx will handle success.
       }
     } catch (err: any) {
       setError(err.error_description || err.message);
@@ -61,7 +63,7 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
       setIsLoading(false);
     }
   };
-  
+
   const handleGoogleLogin = async () => {
     const { error } = await supabase.auth.signInWithOAuth({ provider: 'google' });
     if (error) {
@@ -79,7 +81,6 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
   if (mode === "welcome") {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center relative overflow-hidden bg-gradient-to-br from-violet-100 via-blue-50 to-teal-100 p-6">
-        {/* Background decorations */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-30">
           {[...Array(15)].map((_, i) => (
             <motion.div
@@ -174,7 +175,6 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center relative overflow-hidden bg-gradient-to-br from-violet-100 via-blue-50 to-teal-100 p-6">
-      {/* Background decorations */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-20">
         {[...Array(10)].map((_, i) => (
           <motion.div
@@ -229,32 +229,66 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
           <form onSubmit={handleAuth} className="space-y-4">
             {mode === "signup" && (
               <>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Full Name
+               <div className="text-center">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    I am a...
                   </label>
-                  <input
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    className="w-full px-3 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                    placeholder="Enter your full name"
-                    required
-                  />
+                  <ToggleGroup
+                    type="single"
+                    value={userType}
+                    onValueChange={(value) => {
+                      if (value) setUserType(value as UserRole);
+                    }}
+                    className="justify-center"
+                  >
+                    <ToggleGroupItem value="user">User</ToggleGroupItem>
+                    <ToggleGroupItem value="therapist">Therapist</ToggleGroupItem>
+                  </ToggleGroup>
                 </div>
-                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Username
-                  </label>
-                  <input
-                    type="text"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    className="w-full px-3 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                    placeholder="Choose a unique username"
-                    required
-                  />
-                </div>
+                {userType === 'user' ? (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Full Name
+                      </label>
+                      <input
+                        type="text"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        className="w-full px-3 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        placeholder="Enter your full name"
+                        required
+                      />
+                    </div>
+                     <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Username
+                      </label>
+                      <input
+                        type="text"
+                        value={username}
+                        onChange={(e) => setUsername(e.target.value)}
+                        className="w-full px-3 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        placeholder="Choose a unique username"
+                        required
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Full Name
+                    </label>
+                    <input
+                      type="text"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      className="w-full px-3 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      placeholder="Enter your full name"
+                      required
+                    />
+                  </div>
+                )}
               </>
             )}
 

@@ -1,22 +1,24 @@
 import { useState, useEffect } from "react";
-import { PetSelection } from "./components/PetSelection";
-import { PetCompanion } from "./components/PetCompanion";
-import { JournalScreen } from "./components/JournalScreen";
-import { QuestsAndCoins } from "./components/QuestsAndCoins";
-import { CustomizationScreen } from "./components/CustomizationScreen";
-import { PlayScreen } from "./components/PlayScreen";
-import { FeedScreen } from "./components/FeedScreen";
-import { AnalyticsScreen } from "./components/AnalyticsScreen";
-import { analyzeMoods } from "./utils/moodAnalytics";
-import { Button } from "./components/ui/button";
-import { Card } from "./components/ui/card";
-import { Badge } from "./components/ui/badge";
+import { PetSelection } from "@/components/PetSelection";
+import { PetCompanion } from "@/components/PetCompanion";
+import { JournalScreen } from "@/components/JournalScreen";
+import { QuestsAndCoins } from "@/components/QuestsAndCoins";
+import { CustomizationScreen } from "@/components/CustomizationScreen";
+import { PlayScreen } from "@/components/PlayScreen";
+import { FeedScreen } from "@/components/FeedScreen";
+import { AnalyticsScreen } from "@/components/AnalyticsScreen";
+import { analyzeMoods } from "@/utils/moodAnalytics";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { motion } from "framer-motion";
-import MindPalLeaderboard from "./components/mindpal_leaderboard";
-import { Pet, User } from './types';
-import { supabase } from "./utils/supabase/client";
-import { AuthScreen } from "./components/AuthScreen";
-import { GuestModeReminder } from "./components/GuestModeReminder";
+import MindPalLeaderboard from "@/components/mindpal_leaderboard";
+import { Pet, User } from '@/types';
+import { supabase } from "@/utils/supabase/client";
+import { AuthScreen } from "@/components/AuthScreen";
+import { GuestModeReminder } from "@/components/GuestModeReminder";
+import { TherapistDashboard } from "@/components/TherapistDashboard";
+import { TherapistScreen } from "@/components/TherapistScreen";
 
 interface JournalEntry {
   mood:
@@ -46,7 +48,8 @@ type Screen =
   | "feed"
   | "subscription"
   | "analytics"
-  | "leaderboard";
+  | "leaderboard"
+  | "therapy";
 type PetMood = "happy" | "sad" | "calm" | "angry";
 
 // Extending the User type locally to include is_anonymous without modifying the central types.tsx
@@ -72,7 +75,8 @@ export default function App() {
           is_anonymous: session.user.is_anonymous,
           name: profile?.name || session.user.user_metadata?.full_name || 'Guest',
           username: profile?.username || 'Guest',
-          isPremium: profile?.is_premium || false,
+          user_type: profile?.user_type || 'user', // Add this line
+          is_Premium: profile?.is_premium || false,
           createdAt: new Date(session.user.created_at),
           selected_pet: profile?.selected_pet,
           coins: profile?.coins,
@@ -94,6 +98,7 @@ export default function App() {
   
   const [openGroup, setOpenGroup] =
   useState<null | "tracking" | "pet" | "explore">(null);
+  
   const toggleGroup = (g: "tracking" | "pet" | "explore") =>
   setOpenGroup(prev => (prev === g ? null : g));
 
@@ -112,7 +117,7 @@ export default function App() {
   const [showWelcomeAnimation, setShowWelcomeAnimation] =
     useState(false);
   const [showRiskNudge, setShowRiskNudge] = useState(false);
-  const [isPremium, setIsPremium] = useState(user?.isPremium || false);
+  const [is_Premium, setis_Premium] = useState(user?.is_Premium || false);
   const [showPremiumModal, setShowPremiumModal] =
     useState(false);
   const [showMoodReward, setShowMoodReward] = useState(false);
@@ -128,7 +133,11 @@ export default function App() {
       setCoins(user.coins || 100);
       setJournalEntries(user.journal_entries || []);
       setPetMood((user.pet_mood as PetMood) || "calm");
-      setIsPremium(user.isPremium || false);
+      setis_Premium(user.is_Premium || false);
+
+      if (user.user_type === 'therapist') {
+        return; // Therapist will be handled by the main return logic
+      }
 
       if (user.selected_pet) {
         setCurrentScreen("home");
@@ -165,20 +174,8 @@ export default function App() {
   }, [journalEntries]);
     
   useEffect(() => {
-    if (user && !user.is_anonymous) {
-      const dataToUpdate = { is_premium: isPremium };
-      supabase
-        .from('profiles')
-        .update(dataToUpdate)
-        .eq('id', user.id)
-        .then(({ error }) => {
-          if (error) {
-            console.error('Error updating premium status:', error);
-          }
-        });
-    }
-  }, [isPremium, user]);
-
+    saveData({ is_premium: is_Premium });
+  }, [is_Premium]);
 
   useEffect(() => {
     saveData({ pet_mood: petMood });
@@ -288,7 +285,7 @@ export default function App() {
   };
 
   const handlePremiumFeature = (feature: string) => {
-    if (!isPremium) {
+    if (!is_Premium) {
       setShowPremiumModal(true);
       return;
     }
@@ -310,7 +307,7 @@ export default function App() {
         setCoins(100);
         setJournalEntries([]);
         setPetMood('calm');
-        setIsPremium(false);
+        setis_Premium(false);
     };
 
     const handleGoToSignUp = async () => {
@@ -319,7 +316,7 @@ export default function App() {
     };
 
   const handleSubscribe = () => {
-    setIsPremium(true);
+    setis_Premium(true);
     setShowPremiumModal(false);
     setShowPremiumSuccess(true);
 
@@ -359,6 +356,11 @@ export default function App() {
   if (!user) {
     return <AuthScreen onAuthSuccess={() => {}} />;
   }
+  
+  if (user.user_type === 'therapist') {
+    return <TherapistDashboard onBack={() => {}} />;
+  }
+
 
   if (showWelcomeAnimation) {
     return (
@@ -483,6 +485,19 @@ export default function App() {
       />
     );
   }
+  
+    if (currentScreen === "therapy") {
+    return (
+      <TherapistScreen
+        onBack={() => setCurrentScreen("home")}
+        userData={user}
+        journalEntries={journalEntries}
+        coins={coins}
+        onCoinsUpdate={setCoins}
+      />
+    );
+  }
+
 
   if (currentScreen === "leaderboard") {
   return (
@@ -494,7 +509,7 @@ export default function App() {
         { id: 2, name: "Ibrahim", country: "🇺🇸", xp: 72, streak: 11, avatar: "🦖", delta: -1 },
         { id: 3, name: "Andreana N.", country: "🇺🇸", xp: 70, streak: 9, avatar: "A", delta: 0 },
         { id: 4, name: "Liam", country: "🇨🇦", xp: 68, streak: 5, avatar: "L", delta: +2 },]}
-        onNavigate={setCurrentScreen}
+        onNavigate={(screen) => setCurrentScreen(screen as Screen)}
         />
       );
     }
@@ -557,7 +572,7 @@ export default function App() {
               Logout
             </Button>
 
-            {isPremium && (
+            {is_Premium && (
               <div className="flex items-center space-x-2 bg-gradient-to-r from-pink-200 to-purple-300 px-3 py-1 rounded-full">
                 <span>👑</span>
                 <span className="text-sm font-medium">
@@ -663,7 +678,7 @@ export default function App() {
           >
             <span className="text-2xl">📔</span>
             <span className="text-lg font-medium">Write Journal</span>
-            {!isPremium && journalEntries.length > 0 && (
+            {!is_Premium && journalEntries.length > 0 && (
               <span className="absolute top-2 right-3 text-[10px] px-2 py-0.5 rounded-full bg-white/20">🤖 AI</span>
             )}
           </Button>
@@ -730,7 +745,7 @@ export default function App() {
           >
             <span className="text-2xl">🎮</span>
             <span className="text-lg font-medium">Play</span>
-            {!isPremium && (
+            {!is_Premium && (
               <span className="absolute top-2 right-3 text-[10px] px-2 py-0.5 rounded-full bg-white/25">👑 PRO</span>
             )}
           </Button>
@@ -744,7 +759,7 @@ export default function App() {
           >
             <span className="text-2xl">🍽️</span>
             <span className="text-lg font-medium">Feed</span>
-            {!isPremium && (
+            {!is_Premium && (
               <span className="absolute top-2 right-3 text-[10px] px-2 py-0.5 rounded-full bg-white/25">👑 PRO</span>
             )}
           </Button>
@@ -781,7 +796,7 @@ export default function App() {
       className="bg-white"
       style={{ overflow: "hidden" }}
     >
-      <div className="p-4 md:p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="p-4 md:p-5 grid grid-cols-1 md:grid-cols-3 gap-4">
         <motion.div whileHover={{ scale: 1.02, y: -2 }} whileTap={{ scale: 0.98 }}>
           <Button
             onClick={() => setCurrentScreen("leaderboard")}
@@ -792,8 +807,19 @@ export default function App() {
             <span className="text-lg font-medium">Leaderboard</span>
           </Button>
         </motion.div>
+        
+        <motion.div whileHover={{ scale: 1.02, y: -2 }} whileTap={{ scale: 0.98 }}>
+            <Button
+                onClick={() => setCurrentScreen("therapy")}
+                className="w-full h-16 rounded-2xl bg-gradient-to-r from-teal-400 to-blue-500 text-white
+                            shadow-md hover:shadow-xl transition-all duration-200 flex items-center justify-center gap-3"
+            >
+                <span className="text-2xl">🧠</span>
+                <span className="text-lg font-medium">Therapy</span>
+            </Button>
+        </motion.div>
 
-        {!isPremium ? (
+        {!is_Premium ? (
           <motion.div whileHover={{ scale: 1.02, y: -2 }} whileTap={{ scale: 0.98 }}>
             <Button
               onClick={() => setShowPremiumModal(true)}

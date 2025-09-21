@@ -1,5 +1,5 @@
 "use client";
-import { supabase } from '../utils/supabase/client';
+
 import { motion } from "motion/react";
 import { useState } from "react";
 import { Button } from "./ui/button";
@@ -14,7 +14,6 @@ interface FeedScreenProps {
   onCoinsUpdate: (coins: number) => void;
   coins: number;
 }
-
 
 const foodItems = [
   { id: "apple", name: "Fresh Apple", emoji: "🍎", description: "Crispy and nutritious!", cost: 5, happiness: 10, health: 15 },

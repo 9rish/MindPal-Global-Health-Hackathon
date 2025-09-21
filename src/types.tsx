@@ -1,25 +1,49 @@
-export interface Pet {
+export interface User {
+  id: string;
   name: string;
-  emoji: string;
-  color: string;
+  username: string;
+  email?: string;
+  is_Premium: boolean;
+  coins: number;
+  selected_pet: Pet | null;
+  journal_entries: any[];
+  pet_mood: string;
+  createdAt: Date;
+  user_type: 'user' | 'therapist';
 }
 
-// src/types.tsx
+export interface Pet {
+    id: string;
+    name: string;
+    emoji: string;
+    description: string;
+    color: string;
+    type: 'cat' | 'dog' | 'penguin' | 'rabbit';
+}
 
-export type Profile = {
+export interface Therapist {
   id: string;
-  updated_at?: string;
-  username: string;
-  full_name?: string;
-  avatar_url?: string;
-  website?: string;
-  coins: number;
-  pet_type?: string;
-  pet_name?: string;
-  pet_hunger?: number;
-  pet_happiness?: number;
-  pet_health?: number;
-  last_fed?: string;
-  last_played?: string;
-};
+  name: string;
+  specialization: string;
+  experience: string;
+  description: string;
+  avatar: string;
+  rating: number;
+  isOnline: boolean;
+  price: number;
+  languages: string[];
+  responseTime: string;
+  user_type: 'therapist';
+}
 
+export interface ConnectionRequest {
+  id: string;
+  userId: string;
+  userName: string;
+  therapistId: string;
+  therapistName: string;
+  status: 'pending' | 'accepted' | 'rejected';
+  timestamp: Date;
+  userNote: string;
+  userMoodSummary: string;
+}

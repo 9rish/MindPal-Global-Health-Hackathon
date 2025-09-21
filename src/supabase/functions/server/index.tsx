@@ -2,17 +2,16 @@ import { Hono } from 'npm:hono';
 import { cors } from 'npm:hono/cors';
 import { logger } from 'npm:hono/logger';
 import { createClient } from 'npm:@supabase/supabase-js@2';
-import * as kv from './kv_store.tsx';
 
 const app = new Hono();
 
 // Middleware
 app.use('*', cors({
   origin: '*',
-  allowHeaders: ['*'],userId
+  allowHeaders: ['*'],
   allowMethods: ['*'],
 }));
-app.use('*', logger(console.log));
+app.use('*', logger(console.log));  
 
 // Initialize Supabase client
 const supabase = createClient(
@@ -58,24 +57,18 @@ app.get('/make-server-6d448e25/profile/:userId', async (c) => {
   try {
     const userId = c.req.param('userId');
     
-    const profile = await kv.get(`profile:${userId}`);
+    const { data: profile, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single();
+
+    if (error && error.code !== 'PGRST116') {
+      throw error;
+    }
     
     if (!profile) {
-      // Create default profile
-      const defaultProfile = {
-        userId,
-        selectedPet: null,
-        level: 1,
-        coins: 100, // Use coins instead of gems
-        streak: 0,
-        joinDate: new Date().toISOString(),
-        totalEntries: 0,
-        lastActive: new Date().toISOString(),
-        isPremium: false // Add this line
-      };
-      
-      await kv.set(`profile:${userId}`, defaultProfile);
-      return c.json(defaultProfile);
+      return c.json({ error: 'Profile not found' }, 404);
     }
     
     return c.json(profile);
@@ -93,14 +86,21 @@ app.post('/make-server-6d448e25/profile/:userId', async (c) => {
     const userId = c.req.param('userId');
     const updates = await c.req.json();
 
-    const existingProfile = await kv.get(`profile:${userId}`);
-    const updatedProfile = {
-      ...existingProfile,
-      ...updates,
-      lastActive: new Date().toISOString()
-    };
+    const { data: updatedProfile, error } = await supabase
+      .from('profiles')
+      .update({ ...updates, last_active: new Date().toISOString() })
+      .eq('id', userId)
+      .select()
+      .single();
+    
+    if (error) {
+      throw error;
+    }
 
-    await kv.set(`profile:${userId}`, updatedProfile);
+    if (!updatedProfile) {
+      return c.json({ error: 'Profile not found' }, 404);
+    }
+
     return c.json(updatedProfile);
   } catch (error) {
     console.log('Error updating profile:', error);
@@ -131,23 +131,28 @@ app.post('/make-server-6d448e25/journal/:userId', async (c) => {
       wordCount: text.trim().split(/\s+/).length
     };
 
+    // This still uses kv_store, you might want to migrate this to a proper table as well
     await kv.set(entryId, entry);
 
     // Update user profile stats
-    const profile = await kv.get(`profile:${userId}`);
+    const { data: profile, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single();
+
     if (profile) {
       const today = new Date().toDateString();
-      const lastActiveDate = new Date(profile.lastActive).toDateString();
+      const lastActiveDate = new Date(profile.last_active).toDateString();
 
       const updatedProfile = {
-        ...profile,
-        totalEntries: (profile.totalEntries || 0) + 1,
-        lastActive: new Date().toISOString(),
+        total_entries: (profile.total_entries || 0) + 1,
+        last_active: new Date().toISOString(),
         streak: today === lastActiveDate ? profile.streak : (profile.streak || 0) + 1,
         coins: (profile.coins || 0) + 10 // Changed gems to coins and reward for journaling
       };
 
-      await kv.set(`profile:${userId}`, updatedProfile);
+      await supabase.from('profiles').update(updatedProfile).eq('id', userId);
     }
 
     return c.json({ entry, detectedMood });
@@ -163,6 +168,7 @@ app.get('/make-server-6d448e25/journal/:userId', async (c) => {
     const userId = c.req.param('userId');
     const limit = parseInt(c.req.query('limit') || '10');
 
+    // This still uses kv_store, you might want to migrate this to a proper table as well
     const entries = await kv.getByPrefix(`entry:${userId}:`);
 
     // Sort by timestamp (newest first) and limit
@@ -183,6 +189,7 @@ app.get('/make-server-6d448e25/analytics/:userId', async (c) => {
     const userId = c.req.param('userId');
     const days = parseInt(c.req.query('days') || '7');
 
+    // This still uses kv_store, you might want to migrate this to a proper table as well
     const entries = await kv.getByPrefix(`entry:${userId}:`);
 
     const cutoffDate = new Date();
@@ -257,6 +264,7 @@ app.get('/make-server-6d448e25/quests/:userId', async (c) => {
   try {
     const userId = c.req.param('userId');
 
+    // This still uses kv_store, you might want to migrate this to a proper table as well
     const questProgress = await kv.get(`quests:${userId}`);
 
     if (!questProgress) {
@@ -304,10 +312,17 @@ app.post('/make-server-6d448e25/quests/:userId/complete', async (c) => {
     await kv.set(`quests:${userId}`, questProgress);
 
     // Update user coins
-    const profile = await kv.get(`profile:${userId}`);
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('coins')
+      .eq('id', userId)
+      .single();
+    
     if (profile) {
-      profile.coins = (profile.coins || 0) + reward; // Changed gems to coins
-      await kv.set(`profile:${userId}`, profile);
+      await supabase
+        .from('profiles')
+        .update({ coins: (profile.coins || 0) + reward })
+        .eq('id', userId);
     }
 
     return c.json({ success: true, questProgress });

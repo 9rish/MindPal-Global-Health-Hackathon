@@ -32,10 +32,7 @@ interface User {
 
 export function CustomizationScreen({ pet, coins, onCoinsUpdate, onBack }: CustomizationScreenProps) {
   const [selectedCategory, setSelectedCategory] = useState<string>('hat');
-  const [ownedItems, setOwnedItems] = useState<string[]>(() => {
-    const saved = localStorage.getItem('mindpal-owned-items');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [ownedItems, setOwnedItems] = useState<string[]>([]);
   const [petMood, setPetMood] = useState<'calm' | 'dancing' | 'hungry'>('calm');
   const [user, setUser] = useState<User | null>(null);
 
@@ -44,6 +41,16 @@ export function CustomizationScreen({ pet, coins, onCoinsUpdate, onBack }: Custo
     const fetchUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       setUser(user as User);
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('owned_items')
+          .eq('id', user.id)
+          .single();
+        if (profile) {
+          setOwnedItems(profile.owned_items || []);
+        }
+      }
     };
 
     fetchUser();
@@ -86,14 +93,21 @@ export function CustomizationScreen({ pet, coins, onCoinsUpdate, onBack }: Custo
 
   const filteredAccessories = accessories.filter(acc => acc.category === selectedCategory);
 
-  const purchaseItem = (accessory: Accessory) => {
+  const purchaseItem = async (accessory: Accessory) => {
     if (coins >= accessory.price && !ownedItems.includes(accessory.id)) {
       const newCoins = coins - accessory.price;
       const newOwnedItems = [...ownedItems, accessory.id];
 
       onCoinsUpdate(newCoins);
       setOwnedItems(newOwnedItems);
-      localStorage.setItem('mindpal-owned-items', JSON.stringify(newOwnedItems));
+
+      if (user) {
+        await supabase
+          .from('profiles')
+          .update({ owned_items: newOwnedItems })
+          .eq('id', user.id);
+      }
+
 
       setPetMood('dancing');
       setTimeout(() => setPetMood('calm'), 2000);
@@ -113,7 +127,7 @@ export function CustomizationScreen({ pet, coins, onCoinsUpdate, onBack }: Custo
     }
 
     try {
-      await api.updateProfile(user.id, { isPremium: true });
+      await api.updateProfile(user.id, { is_premium: true });
       alert('Premium enabled successfully! ✨ You now have access to all exclusive features.');
     } catch (error) {
       console.error('Failed to enable premium:', error);

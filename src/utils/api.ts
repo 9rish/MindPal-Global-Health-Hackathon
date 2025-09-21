@@ -31,7 +31,7 @@ class ApiClient {
 
   async updateProfile(userId: string, updates: any) {
     return this.request(`/profile/${userId}`, {
-      method: 'POST',
+      method: 'POST', // Changed from PATCH to POST
       body: JSON.stringify(updates),
     });
   }
