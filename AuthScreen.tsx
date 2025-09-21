@@ -1,19 +1,17 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Button } from "./ui/button";
-import { Card } from "./ui/card";
-import { User } from "../types";
-import { supabase } from '../utils/supabase/client'; // Import Supabase client
-import { ToggleGroup, ToggleGroupItem } from "./ui/toggle-group";
+import { Button } from "/Users/shreyasingh/Downloads/mindpal_hack/MindPal-Global-Health-Hackathon/src/components/ui/button";
+import { Card } from "/Users/shreyasingh/Downloads/mindpal_hack/MindPal-Global-Health-Hackathon/src/components/ui/card.tsx";
+import { User } from "/Users/shreyasingh/Downloads/mindpal_hack/MindPal-Global-Health-Hackathon/src/types.tsx";
 
 interface AuthScreenProps {
   onAuthSuccess: (user: User) => void;
+  onSkip: () => void;
 }
 
 type AuthMode = "login" | "signup" | "welcome";
-type UserRole = "user" | "therapist";
 
-export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
+export function AuthScreen({ onAuthSuccess, onSkip }: AuthScreenProps) {
   const [mode, setMode] = useState<AuthMode>("welcome");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
@@ -22,9 +20,7 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
-  const [username, setUsername] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [userType, setUserType] = useState<UserRole>("user");
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,52 +28,66 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
     setError("");
 
     try {
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 1500));
+
+      // Basic validation
       if (mode === "signup") {
         if (password !== confirmPassword) {
-          throw new Error("Passwords don't match");
+          setError("Passwords don't match");
+          setIsLoading(false);
+          return;
         }
-        const { data, error: signUpError } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: {
-              full_name: name,
-              username: username,
-              user_type: userType, // Pass the user type here
-            },
-          },
-        });
-
-        if (signUpError) throw signUpError;
-        // The onAuthStateChange listener in App.tsx will handle the rest.
-
-      } else if (mode === "login") {
-        const { error: signInError } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-        if (signInError) throw signInError;
-        // The onAuthStateChange listener in App.tsx will handle success.
+        if (name.length < 2) {
+          setError("Name must be at least 2 characters");
+          setIsLoading(false);
+          return;
+        }
       }
-    } catch (err: any) {
-      setError(err.error_description || err.message);
+
+      if (email.length < 5 || !email.includes("@")) {
+        setError("Please enter a valid email");
+        setIsLoading(false);
+        return;
+      }
+
+      if (password.length < 6) {
+        setError("Password must be at least 6 characters");
+        setIsLoading(false);
+        return;
+      }
+
+      // Create mock user
+      const user: User = {
+        id: Date.now().toString(),
+        email,
+        name: mode === "signup" ? name : email.split("@")[0],
+        isPremium: false,
+        createdAt: new Date(),
+      };
+
+      // Store user in localStorage for demo
+      localStorage.setItem("mindpal-user", JSON.stringify(user));
+      
+      onAuthSuccess(user);
+    } catch (err) {
+      setError("Something went wrong. Please try again.");
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleGoogleLogin = async () => {
-    const { error } = await supabase.auth.signInWithOAuth({ provider: 'google' });
-    if (error) {
-      setError(error.message);
-    }
-  };
-
-  const handleGuestMode = async () => {
-     const { error } = await supabase.auth.signInAnonymously();
-    if (error) {
-      setError(error.message);
-    }
+  const handleGuestMode = () => {
+    const guestUser: User = {
+      id: "guest-" + Date.now(),
+      email: "guest@mindpal.app",
+      name: "Guest User",
+      isPremium: false,
+      createdAt: new Date(),
+    };
+    
+    localStorage.setItem("mindpal-user", JSON.stringify(guestUser));
+    onAuthSuccess(guestUser);
   };
 
   if (mode === "welcome") {
@@ -149,14 +159,6 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
                   <span className="bg-white px-2 text-muted-foreground">Or</span>
                 </div>
               </div>
-
-               <Button
-                onClick={handleGoogleLogin}
-                variant="outline"
-                className="w-full h-12 rounded-xl font-medium text-lg"
-              >
-                Sign In with Google
-              </Button>
 
               <Button
                 onClick={handleGuestMode}
@@ -232,50 +234,19 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
         <Card className="p-6 bg-white/80 backdrop-blur-sm border-0 shadow-xl rounded-2xl">
           <form onSubmit={handleAuth} className="space-y-4">
             {mode === "signup" && (
-              <>
-               <div className="text-center">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    I am a...
-                  </label>
-                  <ToggleGroup
-                    type="single"
-                    value={userType}
-                    onValueChange={(value) => {
-                      if (value) setUserType(value as UserRole);
-                    }}
-                    className="justify-center"
-                  >
-                    <ToggleGroupItem value="user">User</ToggleGroupItem>
-                    <ToggleGroupItem value="therapist">Therapist</ToggleGroupItem>
-                  </ToggleGroup>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Full Name
-                  </label>
-                  <input
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    className="w-full px-3 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                    placeholder="Enter your full name"
-                    required
-                  />
-                </div>
-                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Username
-                  </label>
-                  <input
-                    type="text"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    className="w-full px-3 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                    placeholder="Choose a unique username"
-                    required
-                  />
-                </div>
-              </>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Full Name
+                </label>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="w-full px-3 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  placeholder="Enter your full name"
+                  required
+                />
+              </div>
             )}
 
             <div>

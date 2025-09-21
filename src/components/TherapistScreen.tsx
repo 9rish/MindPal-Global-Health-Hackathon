@@ -42,54 +42,54 @@ interface ConnectionRequest {
 const therapists: Therapist[] = [
   {
     id: 'th1',
-    name: 'Dr. Sarah Mitchell',
+    name: 'Dr. Priya Sharma',
     specialization: 'Anxiety & Depression',
     experience: '8 years',
     description: 'Specializes in CBT and mindfulness-based approaches for anxiety and depression. Helps clients develop practical coping strategies.',
-    avatar: 'SM',
+    avatar: 'PS',
     rating: 4.9,
     isOnline: true,
-    price: 120,
-    languages: ['English', 'Spanish'],
+    price: 2500,
+    languages: ['English', 'Hindi'],
     responseTime: '< 2 hours'
   },
   {
     id: 'th2',
-    name: 'Dr. James Wilson',
+    name: 'Dr. Rohan Mehra',
     specialization: 'Stress & Mindfulness',
     experience: '12 years',
     description: 'Expert in mindfulness-based therapy and stress management. Uses meditation and somatic techniques for emotional regulation.',
-    avatar: 'JW',
+    avatar: 'RM',
     rating: 4.8,
     isOnline: false,
-    price: 100,
-    languages: ['English'],
+    price: 2000,
+    languages: ['English', 'Marathi'],
     responseTime: '< 24 hours'
   },
   {
     id: 'th3',
-    name: 'Dr. Emily Chen',
+    name: 'Dr. Ananya Gupta',
     specialization: 'Trauma & EMDR',
     experience: '6 years',
     description: 'Specializes in trauma recovery using EMDR and somatic approaches. Creates a safe space for healing and personal growth.',
-    avatar: 'EC',
+    avatar: 'AG',
     rating: 4.9,
     isOnline: true,
-    price: 130,
-    languages: ['English', 'Mandarin'],
+    price: 2800,
+    languages: ['English', 'Bengali'],
     responseTime: '< 1 hour'
   },
   {
     id: 'th4',
-    name: 'Dr. Michael Rodriguez',
+    name: 'Dr. Vikram Singh',
     specialization: 'Youth & Family Therapy',
     experience: '10 years',
     description: 'Focuses on adolescent mental health and family dynamics. Uses systemic approaches to improve relationships and communication.',
-    avatar: 'MR',
+    avatar: 'VS',
     rating: 4.7,
     isOnline: true,
-    price: 110,
-    languages: ['English', 'Spanish'],
+    price: 2200,
+    languages: ['English', 'Punjabi'],
     responseTime: '< 3 hours'
   }
 ];
@@ -170,14 +170,14 @@ export const TherapistScreen: React.FC<TherapistScreenProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-100 via-purple-50 to-pink-100 p-6">
+    <div className="min-h-screen bg-blue-100 p-6">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <Button onClick={onBack} variant="ghost" className="rounded-full">
             ← Back
           </Button>
-          <h1 className="text-2xl font-semibold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+          <h1 className="text-2xl font-semibold text-blue-800">
             Professional Therapy
           </h1>
           <div className="flex items-center space-x-2">
@@ -188,7 +188,7 @@ export const TherapistScreen: React.FC<TherapistScreenProps> = ({
 
         {/* Connection Status */}
         {(getPendingRequests().length > 0 || getAcceptedRequests().length > 0) && (
-          <Card className="p-6 mb-8 bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
+          <Card className="p-6 mb-8 bg-white border-blue-200">
             <h3 className="text-lg font-medium text-blue-800 mb-4">Your Connections</h3>
             
             {getPendingRequests().length > 0 && (
@@ -227,7 +227,7 @@ export const TherapistScreen: React.FC<TherapistScreenProps> = ({
         )}
 
         {/* Info Banner */}
-        <Card className="p-6 mb-8 bg-gradient-to-r from-purple-50 to-pink-50 border-purple-200">
+        <Card className="p-6 mb-8 bg-white border-purple-200">
           <div className="flex items-start space-x-4">
             <div className="text-3xl">🧠</div>
             <div>
@@ -265,7 +265,7 @@ export const TherapistScreen: React.FC<TherapistScreenProps> = ({
                 <Card className="p-6 hover:shadow-lg transition-all">
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center space-x-4">
-                      <div className="w-12 h-12 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 flex items-center justify-center text-white font-semibold">
+                      <div className="w-12 h-12 rounded-full bg-purple-500 flex items-center justify-center text-white font-semibold">
                         {therapist.avatar}
                       </div>
                       <div>
@@ -305,7 +305,7 @@ export const TherapistScreen: React.FC<TherapistScreenProps> = ({
 
                   <div className="flex items-center justify-between">
                     <span className="text-lg font-semibold text-green-600">
-                      ${therapist.price}/session
+                      ₹{therapist.price}/session
                     </span>
                     {isConnected ? (
                       <Button className="bg-green-600 hover:bg-green-700 text-white rounded-full px-6">
@@ -321,7 +321,7 @@ export const TherapistScreen: React.FC<TherapistScreenProps> = ({
                           setSelectedTherapist(therapist);
                           setShowRequestModal(true);
                         }}
-                        className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-full px-6"
+                        className="bg-purple-600 hover:bg-purple-700 text-white rounded-full px-6"
                       >
                         Request Connection
                       </Button>
@@ -342,7 +342,7 @@ export const TherapistScreen: React.FC<TherapistScreenProps> = ({
               className="bg-white rounded-2xl p-6 max-w-md w-full"
             >
               <div className="flex items-center space-x-3 mb-4">
-                <div className="w-12 h-12 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 flex items-center justify-center text-white font-semibold">
+                <div className="w-12 h-12 rounded-full bg-purple-500 flex items-center justify-center text-white font-semibold">
                   {selectedTherapist.avatar}
                 </div>
                 <div>
@@ -392,7 +392,7 @@ export const TherapistScreen: React.FC<TherapistScreenProps> = ({
                 </Button>
                 <Button
                   onClick={handleRequestConnection}
-                  className="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 text-white"
+                  className="flex-1 bg-purple-600 text-white"
                 >
                   Send Request
                 </Button>
@@ -416,7 +416,7 @@ export const TherapistScreen: React.FC<TherapistScreenProps> = ({
               </p>
               <Button
                 onClick={() => setShowSuccessModal(false)}
-                className="bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-full px-6"
+                className="bg-purple-600 text-white rounded-full px-6"
               >
                 Got it!
               </Button>
