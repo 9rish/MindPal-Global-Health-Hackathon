@@ -43,19 +43,6 @@ interface JournalPageProps {
   onBack: () => void;
 }
 
-interface JournalEntry {
-  id: string;
-  content: string;
-  date: string;
-  mood: string;
-  confidence: number;
-  fineEmotions: Array<{ label: string; score: number }>;
-  sarcastic?: boolean;
-  sarcasticConfidence?: number;
-  sentiment: "positive" | "neutral" | "negative"; // Required for compatibility
-  aiAnalysis?: string;
-}
-
 const journalPrompts = [
   "What made you smile today?",
   "Describe a challenge you overcame recently",

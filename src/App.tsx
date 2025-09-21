@@ -1,3 +1,4 @@
+// old app.tsx
 import { useState, useEffect } from "react";
 import { PetSelection } from "./components/PetSelection";
 import { PetCompanion } from "./components/PetCompanion";
@@ -29,6 +30,11 @@ export interface UserData {
     content: string;
     date: string;
     sentiment: "positive" | "neutral" | "negative";
+    mood?: string; // Optional for backward compatibility
+    confidence?: number; // Optional for backward compatibility
+    fineEmotions?: Array<{ label: string; score: number }>; // Optional for backward compatibility
+    sarcastic?: boolean;
+    sarcasticConfidence?: number;
   }>;
   petXP: number;
   petLevel: number;
@@ -41,12 +47,16 @@ export interface UserData {
 // Define AnalyzedMood type to match moodAnalytics expectations
 type AnalyzedMood = "happy" | "excited" | "energetic" | "content" | "calm" | "sad" | "anxious" | "angry" | "irritated" | "frustrated";
 
-// Updated JournalEntry interface to match analytics expectations
+// Updated JournalEntry interface to include all properties needed by different components
 interface JournalEntry {
   id: string;
   content: string;
   date: Date;
   mood: AnalyzedMood;
+  confidence: number;
+  fineEmotions: Array<{ label: string; score: number }>;
+  sarcastic?: boolean;
+  sarcasticConfidence?: number;
   aiAnalysis?: string;
 }
 
@@ -288,6 +298,24 @@ export default function App() {
     }, 2000);
   };
 
+  // Helper function to convert UserData entries to JournalEntry format for analytics
+  const convertToAnalyticsFormat = (entries: UserData['journalEntries']): JournalEntry[] => {
+    return entries.map(entry => ({
+      id: entry.id,
+      content: entry.content,
+      date: new Date(entry.date),
+      mood: (entry.mood || entry.sentiment) as AnalyzedMood,
+      confidence: entry.confidence || 0.5,
+      fineEmotions: entry.fineEmotions || [{ 
+        label: entry.mood || entry.sentiment, 
+        score: entry.confidence || 0.5 
+      }],
+      sarcastic: entry.sarcastic,
+      sarcasticConfidence: entry.sarcasticConfidence,
+      aiAnalysis: undefined
+    }));
+  };
+
   // Updated function to handle userData updates
   const handleUserDataUpdate = (updates: Partial<UserData>) => {
     setUserData(prevData => {
@@ -317,6 +345,13 @@ export default function App() {
           content: lastEntry.content,
           date: new Date(lastEntry.date),
           mood: sentimentToMoodMap[lastEntry.sentiment] || "calm",
+          confidence: lastEntry.confidence || 0.5,
+          fineEmotions: lastEntry.fineEmotions || [{ 
+            label: lastEntry.mood || lastEntry.sentiment, 
+            score: lastEntry.confidence || 0.5 
+          }],
+          sarcastic: lastEntry.sarcastic,
+          sarcasticConfidence: lastEntry.sarcasticConfidence,
           aiAnalysis: undefined
         };
         
@@ -351,7 +386,10 @@ export default function App() {
 
     // Check for mood-based rewards - wrap in try-catch to handle potential type issues
     try {
-      const analytics = analyzeMoods(newEntries);
+      const analytics = analyzeMoods(newEntries.map(entry => ({
+        ...entry,
+        date: entry.date.toISOString(), // Convert Date to string
+      })));
       const unclaimedRewards = analytics.rewards?.filter(
         (reward) => {
           return (
@@ -423,17 +461,6 @@ export default function App() {
     setSelectedPet(null);
     localStorage.removeItem("mindpal-pet");
   };
-
-  if (authLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-violet-100 via-blue-50 to-teal-100">
-        <div className="text-center">
-          <div className="text-6xl mb-4">🐾</div>
-          <p className="text-gray-600">Loading MindPal...</p>
-        </div>
-      </div>
-    );
-  }
 
   if (authLoading) {
     return (
@@ -574,14 +601,14 @@ export default function App() {
 
   if (currentScreen === "analytics") {
     // Convert journalEntries to match AnalyticsScreen expectations
-    const convertedEntries = journalEntries.map(entry => ({
-      ...entry,
-      mood: entry.mood as AnalyzedMood
-    }));
+    const convertedEntries = convertToAnalyticsFormat(userData.journalEntries);
     
     return (
       <AnalyticsScreen
-        journalEntries={convertedEntries}
+        journalEntries={convertedEntries.map(entry => ({
+          ...entry,
+          date: entry.date.toISOString(),
+        }))}
         coins={coins}
         onCoinsUpdate={(newCoins) => handleUserDataUpdate({ coins: newCoins })}
         onBack={() => setCurrentScreen("home")}
@@ -640,7 +667,7 @@ if (currentScreen === "leaderboard") {
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-3xl text-gray-800 mb-2 font-medium">
-              Hello! 👋
+              Hello usera52bb7fa!! 👋
             </h1>
             <p className="text-gray-600">
               How are you feeling today?

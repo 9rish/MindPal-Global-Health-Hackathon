@@ -62,9 +62,9 @@ export default function PetTrainerDuel({ petEmoji, onBack, onFinish }: DuelProps
     );
 
     // Spawn objects
-    if (Math.random() < 0.02 + gameTime.current * 0.001) {
+    if (Math.random() < 0.002 + gameTime.current * 0.001) {
       objectId.current++;
-      const isGood = Math.random() < 0.55;
+      const isGood = Math.random() < 0.65;
       const type = isGood
         ? GOOD_ITEMS[Math.floor(Math.random() * GOOD_ITEMS.length)]
         : BAD_ITEMS[Math.floor(Math.random() * BAD_ITEMS.length)];
@@ -86,10 +86,10 @@ export default function PetTrainerDuel({ petEmoji, onBack, onFinish }: DuelProps
   // Collision check
   useEffect(() => {
     if (!isRunning || isHit) return;
-    const petY = 640;
+    const petY = 470;
 
     const collision = objects.find(
-      (o) => o.lane === lane && o.y > petY - 50 && o.y < petY + 50
+      (o) => o.lane === lane && o.y > petY - 40 && o.y < petY + 40
     );
 
     if (collision) {
@@ -182,7 +182,7 @@ export default function PetTrainerDuel({ petEmoji, onBack, onFinish }: DuelProps
         </span>
       </div>
 
-      <div className="relative w-[470px] h-[700px] bg-blue-100 rounded-lg overflow-hidden flex border-b-4 border-blue-500">
+      <div className="relative w-[470px] h-[470px] bg-blue-100 rounded-lg overflow-hidden flex border-b-4 border-blue-500">
         {Array.from({ length: NUM_LANES }).map((_, i) => (
           <div key={i} className="flex-1 relative border-r-4 border-blue-300 last:border-r-0">
             {objects
